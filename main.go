@@ -4,8 +4,8 @@ import (
 	"context"
 	"log"
 
+	"github.com/fulecorafa/panoptes/todo"
 	"github.com/spf13/cobra"
-    "github.com/fulecorafa/panoptes/todo"
 )
 
 var command = &cobra.Command{
@@ -17,7 +17,7 @@ var command = &cobra.Command{
         ctx := context.WithValue(cmd.Context(), "tags", []string{"TODO"})
         ctx = context.WithValue(ctx, "fileExtensions", []string{".go", ".json", ".rs"})
         ctx = context.WithValue(ctx, "ignoredDirs", []string{".git", "build"})
-        ctx = context.WithValue(ctx, "throughtput", 1000)
+        ctx = context.WithValue(ctx, "throughtput", 50)
         ctx = context.WithValue(ctx, "root", args[0])
         todo.DisplayTodos(ctx)
     },
