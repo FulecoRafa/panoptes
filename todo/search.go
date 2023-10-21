@@ -16,37 +16,14 @@ import (
 )
 
 func getTodos(ctx context.Context) ([]Todo, error) {
-    ctx, done := context.WithCancel(ctx)
-    defer done()
+    ctx, cancel := context.WithCancelCause(ctx)
+    defer cancel(nil)
 
     /* PIPELINE */
     // Search all files
-    sourceFiles, errc := walkdirGenerator(ctx)
-    throughput := ctx.Value("throughtput").(int)
-    trees := make(chan *sitter.Tree, throughput)
-    wg := sync.WaitGroup{}
-    wg.Add(throughput)
-    for i := 0; i < throughput; i++ {
-        go func() {
-            err := parseFile(ctx, sourceFiles, trees)
-            if err != nil {
-                errc <- err
-                done()
-            }
-            wg.Done()
-        }()
-    }
-    go func() {
-        wg.Wait()
-        close(trees)
-    }()
-
-    for tree := range trees {
-        fmt.Println(tree)
-    }
-
-    if err := <- errc; err != nil {
-        return nil, err
+    pathsChan := walkdirGenerator(ctx, cancel)
+    for path := range pathsChan {
+        fmt.Println(path)
     }
     return nil, nil
 }
@@ -84,21 +61,20 @@ func parseFile(ctx context.Context, files <-chan sourceFile, results chan<- *sit
     return nil
 }
 
-func walkdirGenerator(ctx context.Context) (<-chan sourceFile, chan error) {
+func walkdirGenerator(ctx context.Context, cancelCauseFunc context.CancelCauseFunc) (<-chan sourceFile) {
     log.Default().Println("Walking dir")
-    paths := make(chan sourceFile)
-    errc := make(chan error, 1)
+    pathsChan := make(chan sourceFile)
     root := ctx.Value("root").(string)
     extensions := ctx.Value("fileExtensions").([]string)
     ignoredDirs := ctx.Value("ignoredDirs").([]string)
     go func() {
-        defer close(paths)
-        errc <- filepath.Walk(root, func(path string, info fs.FileInfo, err error) error {
+        defer close(pathsChan)
+        err := filepath.WalkDir(root, func(path string, info fs.DirEntry, err error) error {
             log.Default().Println("Searching ", path)
             if err != nil {
                 return err
             }
-            if !info.Mode().IsRegular() {
+            if !info.Type().IsRegular() {
                 return nil
             }
             // Skip directories
@@ -113,13 +89,16 @@ func walkdirGenerator(ctx context.Context) (<-chan sourceFile, chan error) {
                 return nil
             }
             select {
-            case paths <- sourceFile{path: path, info: info}:
+            case pathsChan <- sourceFile{path: path, info: info}:
                 log.Default().Printf("Sent path `%s`", path)
             case <- ctx.Done():
-                return errors.New("Walk task was cancelled before finishing")
+                return errors.New("walk task was cancelled before finishing")
             }
             return nil
         })
+        if err != nil  {
+            cancelCauseFunc(err)
+        }
     }()
-    return paths, errc
+    return pathsChan
 }
