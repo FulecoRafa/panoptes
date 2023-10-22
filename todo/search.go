@@ -37,7 +37,7 @@ func parseFile(ctx context.Context, files <-chan sourceFile, results chan<- *sit
 
         lang, ok := decideLanguage(file.info)
         if !ok {
-            return errors.New("File of unknown language")
+            return errors.New("could not detect file language")
         }
 
         source, err := io.ReadAll(fileReader)
