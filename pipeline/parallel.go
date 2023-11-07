@@ -7,8 +7,9 @@ import (
 
 type ExecutorFunc[I, O any] func(ctx context.Context, input I) (output O, err error)
 
-func RunInParallel[I, O any](ctx context.Context, cancelCauseFunc context.CancelCauseFunc, workerN int, inputChan <-chan I, executorFunc ExecutorFunc[I,O]) (outputChan chan<- O) {
-	outputChan = make(chan O)
+func RunInParallel[I, O any](ctx context.Context, cancelCauseFunc context.CancelCauseFunc, workerN int, inputChan <-chan I, executorFunc ExecutorFunc[I,O]) (outputChan <-chan O) {
+	ch := make(chan O)
+	outputChan = ch
 	var wg sync.WaitGroup
 	wg.Add(workerN)
 	for i := 0; i < workerN; i++ {
@@ -20,7 +21,7 @@ func RunInParallel[I, O any](ctx context.Context, cancelCauseFunc context.Cancel
 					cancelCauseFunc(err)
 				}
 				select {
-				case outputChan<-thisOutput:
+				case ch<-thisOutput:
 				case <- ctx.Done():
 					return
 				}
@@ -28,7 +29,7 @@ func RunInParallel[I, O any](ctx context.Context, cancelCauseFunc context.Cancel
 		}()
 	}
 	go func() {
-		defer close(outputChan)
+		defer close(ch)
 		wg.Wait()
 	}()
 	return

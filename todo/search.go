@@ -19,17 +19,74 @@ func getTodos(ctx context.Context) ([]Todo, error) {
 	ctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)
 
-    /* Context variables */
+	/* Context variables */
 	workerN := ctx.Value("throughput").(int)
 
 	/* PIPELINE */
 	// Search all files
 	pathsChan := walkdirGenerator(ctx, cancel)
+
+	// Create file parsers
 	parserChan := pipeline.RunInParallel(ctx, cancel, workerN, pathsChan, parseFile)
+
+	// Search todo comments in each file
+	todoChan := pipeline.RunInParallel(ctx, cancel, workerN, parserChan, getTodoComments)
+	// Collect all Todos
+	flatChan := pipeline.Flatten(ctx, todoChan)
+	todos, err := pipeline.CollectToSlice[[]Todo](ctx, flatChan)
+	if err != nil {
+		return nil, err
+	}
+	/* END PIPELINE */
+
+	for _, todo := range todos {
+		log.Default().Println(todo)
+	}
+
 	return nil, nil
 }
 
-func parseFile(ctx context.Context, file sourceFile) (*sitter.Tree, error) {
+func getTodoComments(ctx context.Context, parser *completeParser) ([]Todo, error) {
+	// This is a query string for treesitter to...
+	// Search all comments
+	// Store found comments on `@comment` variable
+	// Conditional match `@comment` to regex
+	// Regex filters all comments that start like // TODO
+	// Whitespaces are ignored
+	todoPattern := `
+	((comment) @comment
+	(#match? @comment "^[\r\n\t\f\v ]*//[\r\n\t\f\v ]*TODO"))
+	`
+	query, err := sitter.NewQuery([]byte(todoPattern), parser.lang)
+	if err != nil {
+		return nil, err
+	}
+
+	qc := sitter.NewQueryCursor()
+	qc.Exec(query, parser.parser.RootNode())
+	todos := []Todo{}
+	for {
+		matcher, found := qc.NextMatch()
+		if !found {
+			break
+		}
+
+		matcher = qc.FilterPredicates(matcher, parser.fileContent)
+		for _, capture := range matcher.Captures {
+			todos = append(todos, Todo{
+				filePath:   parser.path,
+				content:    capture.Node.Content(parser.fileContent),
+				start:      capture.Node.StartByte(),
+				end:        capture.Node.EndByte(),
+				startPoint: capture.Node.StartPoint(),
+				endPoint:   capture.Node.EndPoint(),
+			})
+		}
+	}
+	return todos, nil
+}
+
+func parseFile(ctx context.Context, file sourceFile) (*completeParser, error) {
 	fileReader, err := os.Open(file.path)
 	if err != nil {
 		return nil, err
@@ -51,7 +108,12 @@ func parseFile(ctx context.Context, file sourceFile) (*sitter.Tree, error) {
 	if err != nil {
 		return nil, err
 	}
-    return tree, nil
+	return &completeParser{
+		sourceFile:  file,
+		fileContent: source,
+		parser:      tree,
+		lang:        lang,
+	}, nil
 }
 
 func walkdirGenerator(ctx context.Context, cancelCauseFunc context.CancelCauseFunc) <-chan sourceFile {

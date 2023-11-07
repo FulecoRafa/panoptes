@@ -4,7 +4,7 @@ go 1.21.0
 
 require (
 	github.com/smacker/go-tree-sitter v0.0.0-20230720070738-0d0a9f78d8f8
-	github.com/spf13/cobra v1.7.0
+	github.com/spf13/cobra v1.8.0
 	github.com/src-d/enry/v2 v2.1.0
 )
 
