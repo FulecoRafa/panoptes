@@ -16,7 +16,8 @@ import (
 )
 
 func getTodos(ctx context.Context) ([]Todo, error) {
-	ctx, cancel := context.WithCancelCause(ctx)
+	var cancel context.CancelCauseFunc
+	ctx, cancel = context.WithCancelCause(ctx)
 	defer cancel(nil)
 
 	/* Context variables */
@@ -57,6 +58,7 @@ func getTodoComments(ctx context.Context, parser *completeParser) ([]Todo, error
 	((comment) @comment
 	(#match? @comment "^[\r\n\t\f\v ]*//[\r\n\t\f\v ]*TODO"))
 	`
+	log.Default().Printf("Querying %#v\n", parser)
 	query, err := sitter.NewQuery([]byte(todoPattern), parser.lang)
 	if err != nil {
 		return nil, err
@@ -89,16 +91,20 @@ func getTodoComments(ctx context.Context, parser *completeParser) ([]Todo, error
 func parseFile(ctx context.Context, file sourceFile) (*completeParser, error) {
 	fileReader, err := os.Open(file.path)
 	if err != nil {
+		log.Default().Printf("[ERR] %v: %v", file, err)
 		return nil, err
 	}
 
 	lang, ok := decideLanguage(file.info)
 	if !ok {
-		return nil, errors.New("could not detect file language")
+		err = errors.New("could not detect file language")
+		log.Default().Printf("[ERR] %v: %v", file, err)
+		return nil, pipeline.SkipError
 	}
 
 	source, err := io.ReadAll(fileReader)
 	if err != nil {
+		log.Default().Printf("[ERR] %v: %v", file, err)
 		return nil, err
 	}
 
@@ -106,6 +112,7 @@ func parseFile(ctx context.Context, file sourceFile) (*completeParser, error) {
 	parser.SetLanguage(lang)
 	tree, err := parser.ParseCtx(ctx, nil, source)
 	if err != nil {
+		log.Default().Printf("[ERR] %v: %v", file, err)
 		return nil, err
 	}
 	return &completeParser{

@@ -2,6 +2,8 @@ package pipeline
 
 import (
 	"context"
+	"errors"
+	"log"
 	"sync"
 )
 
@@ -17,13 +19,21 @@ func RunInParallel[I, O any](ctx context.Context, cancelCauseFunc context.Cancel
 			defer wg.Done()
 			for thisInput := range inputChan {
 				thisOutput, err := executorFunc(ctx, thisInput)
+				log.Default().Printf("Parallel processing: %v -> %v ; %v", thisInput, thisOutput, err)
 				if err != nil {
+					if errors.Is(err, SkipError) {
+						log.Default().Printf("[SKIP] Parallel processing: %v -> %v ; %v", thisInput, thisOutput, err)
+						continue
+					}
+					log.Default().Printf("[ERR] Parallel processing: %v -> %v ; %v", thisInput, thisOutput, err)
 					cancelCauseFunc(err)
 				}
 				select {
-				case ch<-thisOutput:
 				case <- ctx.Done():
+					log.Default().Printf("Parallel processing: context is done")
 					return
+				case ch<-thisOutput:
+					log.Default().Printf("Parallel processing: sending %v", thisOutput)
 				}
 			}
 		}()
