@@ -1,0 +1,5 @@
+- [ ] Change static options in main.go to user arguments
+- [ ] Change logging for structured logging
+- [ ] Create performance tests
+- [ ] Add a parser for files without syntax
+- [ ] Add more commands for searching different stuff in project
