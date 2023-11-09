@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/fulecorafa/panoptes/todo"
 	"github.com/spf13/cobra"
 )
@@ -19,7 +20,18 @@ var command = &cobra.Command{
         ctx = context.WithValue(ctx, "ignoredDirs", []string{".git", "build"})
         ctx = context.WithValue(ctx, "throughput", 50)
         ctx = context.WithValue(ctx, "root", args[0])
-        todo.DisplayTodos(ctx)
+        todos, err := todo.GetTodos(ctx)
+        if err != nil {
+            panic(err)
+        }
+
+        log.Default().Printf("%#v\n", todos)
+
+        model := todo.InitialModel(todos)
+        program := tea.NewProgram(model)
+        if _, err := program.Run(); err != nil {
+            panic(err)
+        }
     },
 }
 

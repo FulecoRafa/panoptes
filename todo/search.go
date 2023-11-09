@@ -15,9 +15,8 @@ import (
 	sitter "github.com/smacker/go-tree-sitter"
 )
 
-func getTodos(ctx context.Context) ([]Todo, error) {
-	var cancel context.CancelCauseFunc
-	ctx, cancel = context.WithCancelCause(ctx)
+func GetTodos(parentCtx context.Context) ([]Todo, error) {
+    ctx, cancel := context.WithCancelCause(parentCtx)
 	defer cancel(nil)
 
 	/* Context variables */
@@ -40,11 +39,7 @@ func getTodos(ctx context.Context) ([]Todo, error) {
 	}
 	/* END PIPELINE */
 
-	for _, todo := range todos {
-		log.Default().Println(todo)
-	}
-
-	return nil, nil
+	return todos, nil
 }
 
 func getTodoComments(ctx context.Context, parser *completeParser) ([]Todo, error) {

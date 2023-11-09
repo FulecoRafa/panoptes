@@ -13,7 +13,6 @@ import (
 	"github.com/smacker/go-tree-sitter/html"
 	"github.com/smacker/go-tree-sitter/java"
 	"github.com/smacker/go-tree-sitter/javascript"
-	"github.com/smacker/go-tree-sitter/lua"
 	"github.com/smacker/go-tree-sitter/python"
 	"github.com/smacker/go-tree-sitter/rust"
 	"github.com/smacker/go-tree-sitter/typescript/tsx"
@@ -26,7 +25,7 @@ var languages = map[string]*sitter.Language{
     "C": c.GetLanguage(),
     "C++": cpp.GetLanguage(),
     "CSS": css.GetLanguage(),
-    "Lua": lua.GetLanguage(),
+    // "Lua": lua.GetLanguage(),
     "HTML":html.GetLanguage(),
     "Shell": bash.GetLanguage(),
     "Java": java.GetLanguage(),
